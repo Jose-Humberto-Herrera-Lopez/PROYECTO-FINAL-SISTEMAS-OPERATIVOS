@@ -1,0 +1,1 @@
+# Gestión de memoria RAM de 100MB y el error de Out Of Memory
