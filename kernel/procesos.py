@@ -56,4 +56,37 @@ def validar_entero_positivo(texto, nombre_campo):
 
     return numero
 
+#En esta sección se validarán los datos ingresados y creará un nuevo proceso (PCB)}
+
+def crear_proceso(tamano_texto, rafaga_texto):
+
+    #El global permite modificar la variable siguiente_pid
+    global siguiente_pid
+
+    #Ahora aquí se validan los formatos, deben ser enteros positivos
+    tamano = validar_entero_positivo(tamano_texto, "El tamaño de lamemoria" )
+    rafaga = validar_entero_positivo(rafaga_texto, "La ráfaga del CPU" )
+
+    #Valida si el tamaño es mayor al limite de ram que se puede usar muestra una alerta
+    if tamano > RAM_TOTAL:
+        raise ValueError(f"El tamaño de la memoria del proceso no puede ser mayor a {RAM_TOTAL} MB, el dato ingresado es: '{tamano}'")
+
+    #Si en dado caso todo es valido entonces se crea el proceso y se avanza con el contador
+    proceso = PCB(siguiente_pid, tamano, rafaga)
+    siguiente_pid += 1  #se suma uno al siguiente PID para el próximo proceso que se cree
+    return proceso
+
+
+if __name__ == "__main__":
+    #  ejemplos de algunos casos como exribirían algunos usuarios
+    casos = [("20", "7"), ("abc", "5"), ("", "5"), ("-5", "3"),
+             ("10", "0"), ("3.5", "2"), ("200", "4"), ("35", "4")]
+
+    # Se prueba cada caso: si esta bien ingresado se crea, si no, se muestra el motivo
+    for tamano, rafaga in casos:
+        try:
+            p = crear_proceso(tamano, rafaga)
+            print("Creado:", p)
+        except ValueError as error:
+            print("Rechazado:", error)
 
