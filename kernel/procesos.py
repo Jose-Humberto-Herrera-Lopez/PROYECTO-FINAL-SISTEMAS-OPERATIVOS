@@ -116,6 +116,54 @@ class Planificador:
             print(f"{posicion}. {proceso}")
 
 
+    def ejecutar_round_robin(self):
+
+        #Aqui se ejecutan los procesos de la cola de listos con el algoritmo de Round Robin
+        
+        #Si no existen procesos, no hay nada que se deba ejecutar
+        if not self.cola_listos:
+            print("No hay procesos en la cola de listos para ejecutar.")
+            return
+
+        print(f"Inicio de la planificación Round Robin (quantum = {self.quantum})")
+
+        #El proceso se repetira media vez queden procesos esperando en cola
+        while self.cola_listos:
+
+            #El proceso que esta al frente de la cola se toma y pasa a ejecución
+            proceso = self.cola_listos.popleft()
+            proceso.estado = EJECUTANDO
+
+            #En esta parte se decide cuanto tiempo se va a usar la CPU en ese proceso
+            tiempo_uso = min(self.quantum, proceso.rafaga_restante)
+
+            #En esta sección se avanza el reloj del sistema y se reduce la ráfaga restante del proceso
+            inicio = self.tiempo_actual
+            self.tiempo_actual += tiempo_uso
+            proceso.rafaga_restante -= tiempo_uso
+
+            #En esta parte se muestra en consola lo que ocurrio en este turno del CPU
+            print(f"[t={inicio} a t={self.tiempo_actual}] PID {proceso.pid} se ejecuta "
+                  f"{tiempo_uso} unidad(es). Ráfaga restante: {proceso.rafaga_restante}")
+
+            #Ahora si ya no quedan rafagas entonces el proceso se da por finalizado
+            if proceso.rafaga_restante == 0:
+                proceso.estado = TERMINADO
+                proceso.tiempo_finalizacion = self.tiempo_actual
+                self.terminados.append(proceso)  #append significa agregar al final, la lista crece en uno y se mete en la ultima posicion
+                print(f"    PID {proceso.pid} terminó en t={self.tiempo_actual}")
+
+            #Si todavía llegase a tener ráfagas restantes, el proceso vuelve a la cola de listos y se coloca al final de la cola
+            else:
+                proceso.estado = LISTO
+                self.cola_listos.append(proceso)
+                print(f"    PID {proceso.pid} vuelve a la cola de listos.")
+
+        print("Todos los procesos han terminado.")
+
+
+
+
 
 # SECCIÓN DE PRUEBAS DE LA CLASE PCB Y DEL PLANIFICADOR ROUND ROBIN
 if __name__ == "__main__":
@@ -139,3 +187,7 @@ if __name__ == "__main__":
     # Se muestra cómo quedó la cola de listos al final
     print()
     planificador.mostrar_cola_listos()
+
+    #Se ejecuta el algoritmo de Round Robin con los procesos en cola
+    print()
+    planificador.ejecutar_round_robin()
