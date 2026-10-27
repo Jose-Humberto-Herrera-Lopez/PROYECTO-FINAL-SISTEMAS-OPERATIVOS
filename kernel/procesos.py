@@ -1,6 +1,6 @@
 # Gestión de procesos del PCB y planificación Rount Robin
 
-
+from collections import deque
 
 # Estados de un proceso
 NUEVO = "Nuevo"
@@ -77,16 +77,65 @@ def crear_proceso(tamano_texto, rafaga_texto):
     return proceso
 
 
+QUANTUM = 3 # Es el tiempo máximo del CPU que se tarda por cada turno
+
+
+class Planificador:
+    #Esta clase se encarga de los procesos con el algoritmo Round Robin
+    #Administra la cola de listos y el reloj de la CPU
+
+    def __init__(self, quantum=QUANTUM):
+
+        # Esta es la cola de listos, son los procesos que esperan turno del CPU
+        self.cola_listos = deque()
+
+        # Este es el tiempo máximo que un proceso puede usar la CPU por turno
+        self.quantum = quantum
+
+        # Este es el reloj del sistema, avanza cada vez que el proceso se ejecuta avanza
+        self.tiempo_actual = 0
+
+        # Este es para los rocesos que ya terminaron, calcula las métricas al final
+        self.terminados = []
+
+    def agregar_proceso(self, proceso):
+        #Coloca el proceso al final de la cola de listos, y cambia su status de nuevo a listo
+        proceso.estado = LISTO
+        self.cola_listos.append(proceso)
+
+    def mostrar_cola_listos(self):
+        #Aqui se muestran en consola los procesos que esperan en la cola
+        if not self.cola_listos:
+            print("La cola de listos se encuentra vacia")
+            return
+        
+        print("Procesos en la cola de listos: ")
+        #Aqui se usa enumerate por que ayuda a mostrar la posicion de cada proceso en la cola
+        for posicion, proceso in enumerate(self.cola_listos, start=1):
+
+            print(f"{posicion}. {proceso}")
+
+
+
+# SECCIÓN DE PRUEBAS DE LA CLASE PCB Y DEL PLANIFICADOR ROUND ROBIN
 if __name__ == "__main__":
-    #  ejemplos de algunos casos como exribirían algunos usuarios
+    #  ejemplos de algunos casos como escribirían algunos usuarios
     casos = [("20", "7"), ("abc", "5"), ("", "5"), ("-5", "3"),
              ("10", "0"), ("3.5", "2"), ("200", "4"), ("35", "4")]
 
-    # Se prueba cada caso: si esta bien ingresado se crea, si no, se muestra el motivo
+    # Se crea el planificador que recibirá los procesos válidos
+    planificador = Planificador()
+
+    # Se prueba cada caso, si esta bien ingresado se crea, si no, se muestra el motivo
     for tamano, rafaga in casos:
         try:
             p = crear_proceso(tamano, rafaga)
             print("Creado:", p)
+            # Si el proceso es válido, entra a la cola de listos
+            planificador.agregar_proceso(p)
         except ValueError as error:
             print("Rechazado:", error)
 
+    # Se muestra cómo quedó la cola de listos al final
+    print()
+    planificador.mostrar_cola_listos()
