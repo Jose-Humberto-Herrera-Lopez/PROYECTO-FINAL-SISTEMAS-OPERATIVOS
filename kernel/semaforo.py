@@ -34,7 +34,10 @@ class SemaforoBinario:
         if self.valor == 1:
             self.valor = 0
             self.dueno = pid
-            return False
+            return True
+
+        self.cola_espera.append(pid)
+        return False
 
     """validamos para poder salir de la seccion critica, si no hay nadie dentro, no hay nada que liberar, si quien libera no es el dueno
     error, solo puede salir quien entro, si todo esta bien, si todo esta bien, pasa al siguiente de la cola"""
@@ -85,7 +88,7 @@ class SemaforoBinario:
         dueno = f"P{self.dueno}" if self.dueno is not None else "-"
         cola = ", ".join(f"P{p}" for p in self.cola_espera) or "(vacia)"
         libre = "libre" if self. esta_libre() else "ocupado"
-        return (f"Semaforo = {self.valor} ({libre}) | Dueno: {dueno} | "f"Cola de espera: {cola} | Variable compartida: {self.variable:compartida}")
+        return (f"Semaforo = {self.valor} ({libre}) | Dueno: {dueno} | "f"Cola de espera: {cola} | Variable compartida: {self.variable_compartida}")
 
     """pasa la seccion al primero de la cola, o lo deja libre, aca si nadie espera, libera el semaforo y si hay alguien saca al primero de
     la cola y lo hace nuevo dueno, el valor queda en 0 porque la seccion pasa directo a este proceso"""
@@ -99,7 +102,65 @@ class SemaforoBinario:
 
 """rechaza textos, negativos y el 0"""
 def _validar_pid(pid):
-    if isinstance(id, bool) or not isinstance(pid, int) or pid < 1:
+    if isinstance(pid, bool) or not isinstance(pid, int) or pid < 1:
         raise SemaforoError(f"El PID debe ser un numero entero positivo (recibido: {pid!r})")
     return pid
 
+"""Simulacion de 2 hilos (H1 y H2) que suman a 1 contador que vale 0. Lo correcto es 2. Sin semaforo da 1, con semaforo da 2.
+Devuelve un resultado, lista de pasos, aca guarda cada paso en una lista para mostrarlos en el reporte"""
+def demo_condicion_de_carrera(con_semaforo):
+    pasos = []
+    contador = 0
+
+    if not con_semaforo:
+        pasos.append("Carrera SIN semaforo: H1 y H2 suman 1 a un contador que vale 0")
+        lectura_h1 = contador
+        pasos.append(f"H1 lee el contador = {lectura_h1}")
+        lectura_h2 = contador
+        pasos.append(f"H2 lee el contador = {lectura_h2} (H1 todavia no escribe)")
+        contador = lectura_h1 + 1
+        pasos.append(f"H1 calcula {lectura_h1} + 1 y escribe {contador}")
+        contador = lectura_h2 + 1
+        pasos.append(f"H2 calcula {lectura_h2} + 1 y escribe {contador} (sobreescribe lo de H1)")
+        pasos.append(f"Resultado: {contador}, se esperaba 2 -> CONDICION DE CARRERA")
+        return contador, pasos
+    pasos.append("Carrera CON semáforo: H1 y H2 suman 1 a un contador que vale 0")
+    semaforo = SemaforoBinario()
+    semaforo.wait(1)
+    pasos.append("H1 hace wait(): entra a la sección crítica (semáforo = 0)")
+    semaforo.wait(2)
+    pasos.append("H2 hace wait(): la sección está ocupada, H2 queda BLOQUEADO")
+    lectura_h1 = contador
+    contador = lectura_h1 + 1
+    pasos.append(f"H1 lee {lectura_h1}, calcula {lectura_h1} + 1 y escribe {contador}")
+    siguiente = semaforo.signal(1)
+    pasos.append(f"H1 hace signal(): sale y entra H{siguiente}")
+    lectura_h2 = contador
+    contador = lectura_h2 + 1
+    pasos.append(f"H2 lee {lectura_h2}, calcula {lectura_h2} + 1 y escribe {contador}")
+    semaforo.signal(2)
+    pasos.append("H2 hace signal(): sale (semáforo = 1)")
+    pasos.append(f"Resultado: {contador}, se esperaba 2 -> el semáforo garantizó la exclusión mutua")
+    return contador, pasos
+
+"""Ejecucion del proyecto en demo, desde archivo directo sin utilizacion de main, solo es para pruebas"""
+if __name__ == "__main__":
+    s = SemaforoBinario()
+    print("P1 wait ->", s.wait(1))          #
+    print("P2 wait ->", s.wait(2))          
+    print(s.describir())
+    print("P1 signal ->", s.signal(1))     
+    print(s.describir())
+    try:
+        s.signal(1)                         
+    except SemaforoError as error:
+        print("Error esperado:", error)
+    try:
+        s.wait("abc")                      
+    except SemaforoError as error:
+        print("Error esperado:", error)
+    for usar_semaforo in (False, True):
+        resultado, pasos = demo_condicion_de_carrera(usar_semaforo)
+        print()
+        for paso in pasos:
+            print("  " + paso)
