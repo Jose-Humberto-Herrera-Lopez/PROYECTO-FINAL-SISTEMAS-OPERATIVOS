@@ -161,8 +161,49 @@ class Planificador:
 
         print("Todos los procesos han terminado.")
 
+    
+    def mostrar_metricas(self):
+        #Calcula e imprime el tiempo de retorno y de espera de cada proceso terminado, junto con sus promedios
 
+        #Si ningún proceso  ha terminado no existen datos para calcular
+        if not self.terminados:
+            print("No hay procesos terminados para calcular nada.")
+            return  
 
+        print("Las metricas del Round Robin:")
+        
+        # Encabezado de la tabla. Los :<n hacen que cada columna ocupe n espacios
+        # alineada a la izquierda, para que los datos queden ordenados.
+        print(f"{'PID':<6}{'Ráfaga':<9}{'Finalización':<15}{'Retorno':<10}{'Espera':<8}")
+
+        #Estos son acumuladores que me ayudarán a calcular el promedio al final}
+        suma_retorno = 0
+        suma_espera = 0
+
+        #Se recorren los procesos en el orden en que terminaron
+        for proceso in self.terminados:
+
+            #El tiempo de retorno es finalización - llegada
+            tiempo_retorno = proceso.tiempo_finalizacion
+
+            #El tiempo de espera es igual a retorno - rafaga total da el tiempo que paso en cola sin usar la CPU
+            proceso.tiempo_espera = tiempo_retorno - proceso.rafaga_total
+
+            #Aqui se suman los valores para calcular los promedios después
+            suma_retorno += tiempo_retorno
+            suma_espera += proceso.tiempo_espera
+
+            #Aqui se imprime
+            print(f"{proceso.pid:<6}{proceso.rafaga_total:<9}"
+                  f"{proceso.tiempo_finalizacion:<15}{tiempo_retorno:<10}"
+                  f"{proceso.tiempo_espera:<8}")
+
+        # Promedio es igual a la suma de todos los valores dividido cantidad de procesos.
+        # :.2f muestra el resultado con 2 decimales.
+        cantidad = len(self.terminados)
+        print()
+        print(f"Tiempo de retorno promedio: {suma_retorno / cantidad:.2f}")
+        print(f"Tiempo de espera promedio: {suma_espera / cantidad:.2f}")
 
 
 # SECCIÓN DE PRUEBAS DE LA CLASE PCB Y DEL PLANIFICADOR ROUND ROBIN
@@ -191,3 +232,6 @@ if __name__ == "__main__":
     #Se ejecuta el algoritmo de Round Robin con los procesos en cola
     print()
     planificador.ejecutar_round_robin()
+
+    print()
+    planificador.mostrar_metricas()
