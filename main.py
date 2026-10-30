@@ -5,10 +5,12 @@ Menú principal del simulador.
 
 from kernel.semaforo import SemaforoBinario, SemaforoError, demo_condicion_de_carrera
 from kernel.deadlock import GestorRecursos, DeadlockError
+from kernel.procesos import Planificador, crear_proceso
 
 # Un solo semáforo y un solo gestor de recursos para todo el programa
 semaforo = SemaforoBinario()
 gestor = GestorRecursos()
+planificador = Planificador()
 
 def leer_numero(mensaje):
     texto = input(mensaje).strip()
@@ -18,19 +20,24 @@ def leer_numero(mensaje):
         return texto
 def mostrar_menu():
     print("\n================ SIMULADOR DE KERNEL ================")
+    print("  --- Punto A: Procesos y Round Robin ---")
+    print("   1. Crear un proceso")
+    print("   2. Ver cola de listos")
+    print("   3. Ejecutar Round Robin (quantum = 3)")
+    print("   4. Ver métricas de tiempos")
     print("  --- Punto C: Semáforo ---")
-    print("   1. wait()  - un proceso pide entrar a la sección crítica")
-    print("   2. signal() - el dueño sale de la sección crítica")
-    print("   3. Escribir en la variable compartida")
-    print("   4. Ver estado del semáforo")
-    print("   5. Demo de condición de carrera (sin y con semáforo)")
+    print("   5. wait()  - un proceso pide entrar a la sección crítica")
+    print("   6. signal() - el dueño sale de la sección crítica")
+    print("   7. Escribir en la variable compartida")
+    print("   8. Ver estado del semáforo")
+    print("   9. Demo de condición de carrera (sin y con semáforo)")
     print("  --- Punto D: Deadlock ---")
-    print("   6. Solicitar un recurso (R1 o R2)")
-    print("   7. Liberar un recurso")
-    print("   8. Simular deadlock")
-    print("   9. Detectar deadlock")
-    print("  10. Abortar un proceso (kill)")
-    print("  11. Ver estado de los recursos")
+    print("  10. Solicitar un recurso (R1 o R2)")
+    print("  11. Liberar un recurso")
+    print("  12. Simular deadlock")
+    print("  13. Detectar deadlock")
+    print("  14. Abortar un proceso (kill)")
+    print("  15. Ver estado de los recursos")
     print("   0. Salir")
 
 def opcion_wait():
@@ -84,7 +91,7 @@ def opcion_detectar():
     ciclo = gestor.detectar_deadlock()
     if ciclo:
         print("[DEADLOCK] ¡Deadlock detectado!", gestor.describir_ciclo(ciclo))
-        print(f"           Para romperlo usa la opción 10 y aborta P{ciclo[0]} o P{ciclo[1]}")
+        print(f"           Para romperlo usa la opción 14 y aborta P{ciclo[0]} o P{ciclo[1]}")
     else:
         print("[OK] No hay deadlock: el grafo de espera no tiene ciclos")
 def opcion_abortar():
@@ -105,19 +112,39 @@ def alerta_si_hay_deadlock():
     if ciclo:
         print("[DEADLOCK] ¡ALERTA! Deadlock detectado:", gestor.describir_ciclo(ciclo))
 
+def opcion_crear_proceso():
+    tamano = input("Tamaño en memoria (MB): ")
+    rafaga = input("Rafaga del CPU: ")
+    try:
+        proceso = crear_proceso(tamano, rafaga)
+    except ValueError as error:
+        print(f"ERROR CAPA 8 {error}")
+        return
+
+    planificador.agregar_proceso(proceso)
+    print("TODO EN ORDEN, proceso creado y agregado a la cola de listos")
+    print(f" {proceso}")
+
 OPCIONES = {
-    # --- Punto A (Humberto) y Punto B (Angie): aquí agregan sus números ---
-    "1": opcion_wait,
-    "2": opcion_signal,
-    "3": opcion_escribir,
-    "4": lambda: print(semaforo.describir()),
-    "5": opcion_carrera,
-    "6": opcion_solicitar,
-    "7": opcion_liberar,
-    "8": opcion_simular,
-    "9": opcion_detectar,
-    "10": opcion_abortar,
-    "11": lambda: print(gestor.describir()),
+    # --- Punto A: Procesos y Round Robin (Humberto) ---
+    "1": opcion_crear_proceso,
+    "2": planificador.mostrar_cola_listos,
+    "3": planificador.ejecutar_round_robin,
+    "4": planificador.mostrar_metricas,
+    # --- Punto B: Memoria (Angie): pendiente ---
+    # --- Punto C: Semáforo (Kevin) ---
+    "5": opcion_wait,
+    "6": opcion_signal,
+    "7": opcion_escribir,
+    "8": lambda: print(semaforo.describir()),
+    "9": opcion_carrera,
+    # --- Punto D: Deadlock (Kevin) ---
+    "10": opcion_solicitar,
+    "11": opcion_liberar,
+    "12": opcion_simular,
+    "13": opcion_detectar,
+    "14": opcion_abortar,
+    "15": lambda: print(gestor.describir()),
 }
 def main():
     while True:
