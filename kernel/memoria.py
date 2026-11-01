@@ -1,3 +1,4 @@
+# Gestión de memoria RAM de 100MB y el error de Out Of Memory
 class MemoriaError(Exception):
     """Out of Memory"""
     pass
@@ -36,4 +37,3 @@ class GestorMemoria:
             "memoria_ocupada": self.capacidad_total - self.memoria_disponible,
             "bloques_asignados": self.bloques_asignados
         }
-# Gestión de memoria RAM de 100MB y el error de Out Of Memory
