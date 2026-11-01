@@ -1,0 +1,187 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Simulador de Kernel · Puntos C y D</title>
+
+  <!-- Tipografías: Manrope para el texto y JetBrains Mono para la consola -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Manrope:wght@400;600;800&display=swap">
+
+  <!-- PyScript: permite ejecutar Python dentro del navegador -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@pyscript/core@0.7.31/dist/core.css">
+  <script type="module" src="https://cdn.jsdelivr.net/npm/@pyscript/core@0.7.31/dist/core.js"></script>
+
+  <style>
+    /* ===== Paleta de colores (cámbiala aquí y se cambia en toda la página) ===== */
+    :root {
+      --fondo: #efeee9;        /* gris piedra */
+      --panel: #fbfbf9;        /* casi blanco */
+      --borde: #d9d7cf;
+      --tinta: #1c1c1a;        /* texto principal */
+      --tenue: #6b6a63;        /* texto secundario */
+      --oliva: #4d7c0f;        /* color principal */
+      --oliva-osc: #3f6212;
+      --mostaza: #b7791f;      /* Punto D */
+      --vino: #9f1239;         /* acciones peligrosas (kill) */
+      --consola: #1c1b19;      /* fondo de la bitácora */
+      --consola-texto: #e8e6df;
+    }
+
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--fondo); color: var(--tinta); font-family: "Manrope", "Segoe UI", Arial, sans-serif; }
+
+    /* ===== Barra superior ===== */
+    .barra { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap;
+             padding: 18px 28px; border-bottom: 1px solid var(--borde); background: var(--panel); }
+    .marca { display: flex; align-items: center; gap: 14px; }
+    .logo { width: 44px; height: 44px; border-radius: 12px; display: grid; place-items: center;
+            background: var(--tinta); color: var(--fondo); font: 800 20px "JetBrains Mono", monospace; }
+    .marca h1 { margin: 0; font-size: 20px; font-weight: 800; letter-spacing: -0.02em; }
+    .marca p { margin: 2px 0 0; color: var(--tenue); font-size: 13px; }
+    .cargando { margin: 0; font-size: 13px; color: var(--mostaza); font-weight: 600; }
+
+    /* ===== Tablero: paneles a la izquierda, consola a la derecha ===== */
+    .tablero { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); gap: 20px; padding: 24px 28px; }
+    .columna { display: flex; flex-direction: column; gap: 20px; min-width: 0; }
+
+    .panel { background: var(--panel); border: 1px solid var(--borde); border-radius: 16px; padding: 20px 22px; }
+    .panel-cabeza { display: flex; align-items: center; gap: 14px; margin-bottom: 16px; }
+    .letra { width: 52px; height: 52px; border-radius: 14px; display: grid; place-items: center;
+             font: 800 26px "JetBrains Mono", monospace; color: #fff; background: var(--oliva); }
+    .panel.d .letra { background: var(--mostaza); }
+    .panel-cabeza h2 { margin: 0; font-size: 18px; font-weight: 800; }
+    .panel-cabeza p { margin: 2px 0 0; color: var(--tenue); font-size: 13px; }
+
+    /* ===== Campos de texto ===== */
+    .campos { display: flex; gap: 14px; flex-wrap: wrap; }
+    .campo { display: flex; flex-direction: column; gap: 5px; }
+    label { font-size: 12px; font-weight: 600; color: var(--tenue); text-transform: uppercase; letter-spacing: 0.05em; }
+    input, select { width: 150px; padding: 10px 12px; border: 1px solid var(--borde); border-radius: 10px;
+                    background: #fff; color: var(--tinta); font: 600 14px "JetBrains Mono", monospace; }
+    input:focus, select:focus { outline: 2px solid var(--oliva); outline-offset: 1px; }
+
+    /* ===== Botones ===== */
+    .acciones { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; }
+    button { padding: 10px 16px; border-radius: 10px; cursor: pointer; font: 700 13px "Manrope", sans-serif;
+             border: 1px solid var(--tinta); background: transparent; color: var(--tinta); transition: background .15s, color .15s; }
+    button:hover { background: var(--tinta); color: var(--fondo); }
+    button.principal { background: var(--oliva); border-color: var(--oliva); color: #fff; }
+    button.principal:hover { background: var(--oliva-osc); }
+    .panel.d button.principal { background: var(--mostaza); border-color: var(--mostaza); }
+    button.peligro { border-color: var(--vino); color: var(--vino); }
+    button.peligro:hover { background: var(--vino); color: #fff; }
+
+    /* ===== Estado del semáforo y de los recursos ===== */
+    .estado { margin: 16px 0 0; padding: 12px 14px; border-radius: 10px; background: var(--fondo);
+              border-left: 4px solid var(--oliva); font: 13px/1.6 "JetBrains Mono", monospace; white-space: pre-wrap; }
+    .panel.d .estado { border-left-color: var(--mostaza); }
+
+    /* ===== Bitácora estilo terminal ===== */
+    .consola { background: var(--consola); border-radius: 16px; overflow: hidden; display: flex; flex-direction: column;
+               min-height: 520px; position: sticky; top: 24px; align-self: start; height: calc(100vh - 140px); }
+    .consola-cabeza { display: flex; align-items: center; gap: 7px; padding: 12px 16px; border-bottom: 1px solid #2e2c29;
+                      color: #9c998f; font: 600 12px "JetBrains Mono", monospace; }
+    .punto { width: 11px; height: 11px; border-radius: 50%; background: #3a3833; }
+    .punto:nth-child(1) { background: #e0675a; } .punto:nth-child(2) { background: #e2b04b; } .punto:nth-child(3) { background: #8fb35a; }
+    .consola-cabeza span.titulo { margin-left: 8px; }
+    #bitacora { flex: 1; overflow-y: auto; padding: 14px 16px; color: var(--consola-texto); font: 13px/1.65 "JetBrains Mono", monospace; }
+    .linea { padding: 1px 0; }
+    .ok { color: #b5d98a; } .bloqueo { color: #f2c46d; } .error { color: #f28b82; } .deadlock { color: #f0a6c8; font-weight: 600; }
+
+    /* ===== Pantallas pequeñas: todo en una columna ===== */
+    @media (max-width: 900px) {
+      .tablero { grid-template-columns: 1fr; padding: 16px; }
+      .consola { position: static; height: 360px; min-height: 0; }
+      .barra { padding: 14px 16px; }
+    }
+  </style>
+</head>
+<body>
+  <header class="barra">
+    <div class="marca">
+      <span class="logo">K</span>
+      <div>
+        <h1>Simulador de Kernel</h1>
+        <p>Sistema Operativo I · Puntos C y D · Python en el navegador con PyScript</p>
+      </div>
+    </div>
+    <p id="cargando" class="cargando">Cargando Python en el navegador...</p>
+  </header>
+
+  <main class="tablero">
+    <div class="columna">
+
+      <!-- ===== Punto C ===== -->
+      <section class="panel c">
+        <div class="panel-cabeza">
+          <span class="letra">C</span>
+          <div>
+            <h2>Semáforo binario</h2>
+            <p>Exclusión mutua sobre una variable compartida</p>
+          </div>
+        </div>
+        <div class="campos">
+          <div class="campo">
+            <label for="pid-sem">PID del proceso</label>
+            <input id="pid-sem" placeholder="ej. 1">
+          </div>
+          <div class="campo">
+            <label for="valor">Valor de la variable</label>
+            <input id="valor" placeholder="ej. 5">
+          </div>
+        </div>
+        <div class="acciones">
+          <button id="btn-wait" class="principal">wait()</button>
+          <button id="btn-signal" class="principal">signal()</button>
+          <button id="btn-escribir">Escribir variable</button>
+          <button id="btn-carrera">Condición de carrera</button>
+        </div>
+        <pre id="estado-semaforo" class="estado"></pre>
+      </section>
+
+      <!-- ===== Punto D ===== -->
+      <section class="panel d">
+        <div class="panel-cabeza">
+          <span class="letra">D</span>
+          <div>
+            <h2>Recursos y deadlock</h2>
+            <p>R1 y R2 exclusivos · detección de espera circular</p>
+          </div>
+        </div>
+        <div class="campos">
+          <div class="campo">
+            <label for="pid-rec">PID del proceso</label>
+            <input id="pid-rec" placeholder="ej. 1">
+          </div>
+          <div class="campo">
+            <label for="recurso">Recurso</label>
+            <select id="recurso"><option>R1</option><option>R2</option></select>
+          </div>
+        </div>
+        <div class="acciones">
+          <button id="btn-solicitar" class="principal">Solicitar</button>
+          <button id="btn-liberar">Liberar</button>
+          <button id="btn-simular">Simular deadlock (P1 y P2)</button>
+          <button id="btn-detectar">Detectar</button>
+          <button id="btn-abortar" class="peligro">Abortar proceso (kill)</button>
+        </div>
+        <pre id="estado-recursos" class="estado"></pre>
+      </section>
+    </div>
+
+    <!-- ===== Bitácora (estilo terminal) ===== -->
+    <aside class="consola">
+      <div class="consola-cabeza">
+        <span class="punto"></span><span class="punto"></span><span class="punto"></span>
+        <span class="titulo">bitácora del kernel</span>
+      </div>
+      <div id="bitacora"></div>
+    </aside>
+  </main>
+
+  <!-- Aquí se carga el Python: app.py usa kernel/semaforo.py y kernel/deadlock.py -->
+  <script type="py" src="./app.py" config="./pyscript.toml"></script>
+</body>
+</html>

@@ -1,0 +1,6 @@
+# Archivos de Python que PyScript copia al navegador.
+# Izquierda: dónde está el archivo (relativo a esta página). Derecha: con qué nombre lo ve Python.
+[files]
+"../kernel/__init__.py" = "kernel/__init__.py"
+"../kernel/semaforo.py" = "kernel/semaforo.py"
+"../kernel/deadlock.py" = "kernel/deadlock.py"
