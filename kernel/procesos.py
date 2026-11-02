@@ -103,6 +103,36 @@ class Planificador:
         proceso.estado = LISTO
         self.cola_listos.append(proceso)
 
+    def buscar_proceso(self, pid):
+        
+        #Busca un proceso activo por su PID
+        #Un proceso está activo si está en la cola de listos (creado y sin terminar)
+        #Devuelve el PCB si lo encuentra, o None si no existe o ya terminó
+        
+        # En esta parte se recorre la cola de listos y compara los PID de cada proceso
+        for proceso in self.cola_listos:
+            if proceso.pid == pid:
+                return proceso   # Se encontró: se devuelve y la búsqueda termina.
+
+        # Si el ciclo termina sin encontrarlo entonces el proceso no estará activo
+        return None
+
+    def quitar_proceso(self, pid):
+        
+        #Saca un proceso de la cola de listos, por ejemplo al abortarlo por deadlock
+        #Devuelve el PCB quitado, o None si el proceso no estaba en la cola
+        # Se reutiliza buscar_proceso para no repetir el recorrido.
+        proceso = self.buscar_proceso(pid)
+        if proceso is None:
+            return None
+
+        # remove() saca ese proceso de la cola, sin importar su posición.
+        self.cola_listos.remove(proceso)
+
+        # El proceso abortado ya no se ejecutará, así que pasa a Terminado.
+        proceso.estado = TERMINADO
+        return proceso
+
     def mostrar_cola_listos(self):
         #Aqui se muestran en consola los procesos que esperan en la cola
         if not self.cola_listos:
@@ -228,6 +258,11 @@ if __name__ == "__main__":
     # Se muestra cómo quedó la cola de listos al final
     print()
     planificador.mostrar_cola_listos()
+
+    print()
+    print("Buscar PID 2:", planificador.buscar_proceso(2))
+    print("Buscar PID 99:", planificador.buscar_proceso(99))
+    print("Quitar PID 99:", planificador.quitar_proceso(99))
 
     #Se ejecuta el algoritmo de Round Robin con los procesos en cola
     print()
