@@ -6,11 +6,13 @@ Menú principal del simulador.
 from kernel.semaforo import SemaforoBinario, SemaforoError, demo_condicion_de_carrera
 from kernel.deadlock import GestorRecursos, DeadlockError
 from kernel.procesos import Planificador, crear_proceso
+from kernel.memoria import GestorMemoria, MemoriaError
 
 # Un solo semáforo y un solo gestor de recursos para todo el programa
 semaforo = SemaforoBinario()
 gestor = GestorRecursos()
 planificador = Planificador()
+memoria = GestorMemoria()
 
 def leer_numero(mensaje):
     texto = input(mensaje).strip()
@@ -25,19 +27,21 @@ def mostrar_menu():
     print("   2. Ver cola de listos")
     print("   3. Ejecutar Round Robin (quantum = 3)")
     print("   4. Ver métricas de tiempos")
+    print("  --- Punto B: Memoria ---")
+    print("   5. Ver estado de la memoria RAM")
     print("  --- Punto C: Semáforo ---")
-    print("   5. wait()  - un proceso pide entrar a la sección crítica")
-    print("   6. signal() - el dueño sale de la sección crítica")
-    print("   7. Escribir en la variable compartida")
-    print("   8. Ver estado del semáforo")
-    print("   9. Demo de condición de carrera (sin y con semáforo)")
+    print("   6. wait()  - un proceso pide entrar a la sección crítica")
+    print("   7. signal() - el dueño sale de la sección crítica")
+    print("   8. Escribir en la variable compartida")
+    print("   9. Ver estado del semáforo")
+    print("  10. Demo de condición de carrera (sin y con semáforo)")
     print("  --- Punto D: Deadlock ---")
-    print("  10. Solicitar un recurso (R1 o R2)")
-    print("  11. Liberar un recurso")
-    print("  12. Simular deadlock")
-    print("  13. Detectar deadlock")
-    print("  14. Abortar un proceso (kill)")
-    print("  15. Ver estado de los recursos")
+    print("  11. Solicitar un recurso (R1 o R2)")
+    print("  12. Liberar un recurso")
+    print("  13. Simular deadlock")
+    print("  14. Detectar deadlock")
+    print("  15. Abortar un proceso (kill)")
+    print("  16. Ver estado de los recursos")
     print("   0. Salir")
 
 def opcion_wait():
@@ -91,13 +95,18 @@ def opcion_detectar():
     ciclo = gestor.detectar_deadlock()
     if ciclo:
         print("[DEADLOCK] ¡Deadlock detectado!", gestor.describir_ciclo(ciclo))
-        print(f"           Para romperlo usa la opción 14 y aborta P{ciclo[0]} o P{ciclo[1]}")
+        print(f"           Para romperlo usa la opción 15 y aborta P{ciclo[0]} o P{ciclo[1]}")
     else:
         print("[OK] No hay deadlock: el grafo de espera no tiene ciclos")
 def opcion_abortar():
     pid = leer_numero("PID del proceso a abortar: ")
     habia_deadlock = bool(gestor.detectar_deadlock())
     entregas = gestor.abortar_proceso(pid)
+    
+    # Si el proceso abortado tenía memoria asignada, se libera.
+    if memoria.liberar_memoria(pid):
+        print(f"[MEMORIA] Se liberó la memoria de P{pid}")
+
     semaforo.liberar_proceso(pid)  # si tenía la sección crítica, también la suelta
     print(f"[ALERTA] P{pid} abortado")
     for recurso, nuevo_dueno in entregas:
@@ -115,37 +124,78 @@ def alerta_si_hay_deadlock():
 def opcion_crear_proceso():
     tamano = input("Tamaño en memoria (MB): ")
     rafaga = input("Rafaga del CPU: ")
+
+    # Validación de formato en el modulo del proceso
     try:
         proceso = crear_proceso(tamano, rafaga)
     except ValueError as error:
         print(f"ERROR CAPA 8 {error}")
         return
 
+    #Validacion de espacio en la RAM
+    try:
+        memoria.asignar_memoria(proceso.pid, proceso.tamano_memoria)
+    except MemoriaError as error:
+        print(f"[OUT OF MEMORY] {error}")
+        print("     El proceso fue rechazado y no entra a la cola de listos.")
+        return
+
     planificador.agregar_proceso(proceso)
     print("TODO EN ORDEN, proceso creado y agregado a la cola de listos")
     print(f" {proceso}")
+
+def opcion_ejecutar_round_robin():
+    """Ejecuta Round Robin y libera la memoria de los procesos que terminaron."""
+    planificador.ejecutar_round_robin()
+
+    # Un proceso terminado ya no necesita su memoria, así que se libera.
+    # liberar_memoria devuelve False si ya se había liberado antes,
+    # por eso solo se muestra el mensaje la primera vez.
+    for proceso in planificador.terminados:
+        if memoria.liberar_memoria(proceso.pid):
+            print(f"[MEMORIA] Se liberaron {proceso.tamano_memoria} MB de P{proceso.pid}")
+                
+
+def opcion_ver_memoria():
+    """Muestra cuánta RAM está ocupada y libre, y qué procesos la usan."""
+    # estado_memoria devuelve un diccionario con los datos de la RAM.
+    estado = memoria.estado_memoria()
+    print(f"RAM total: {estado['capacidad_total']} MB")
+    print(f"Ocupada:   {estado['memoria_ocupada']} MB")
+    print(f"Libre:     {estado['memoria_disponible']} MB")
+
+    if not estado["bloques_asignados"]:
+        print("No hay procesos ocupando memoria.")
+        return
+
+    print("Procesos en memoria:")
+    # .items() recorre el diccionario en parejas (pid, tamaño).
+    for pid, tamano in estado["bloques_asignados"].items():
+        print(f"  P{pid}: {tamano} MB")
 
 OPCIONES = {
     # --- Punto A: Procesos y Round Robin (Humberto) ---
     "1": opcion_crear_proceso,
     "2": planificador.mostrar_cola_listos,
-    "3": planificador.ejecutar_round_robin,
+    "3": opcion_ejecutar_round_robin,
     "4": planificador.mostrar_metricas,
-    # --- Punto B: Memoria (Angie): pendiente ---
+    # --- Punto B: Memoria (Angie) ---
+    "5": opcion_ver_memoria,
     # --- Punto C: Semáforo (Kevin) ---
-    "5": opcion_wait,
-    "6": opcion_signal,
-    "7": opcion_escribir,
-    "8": lambda: print(semaforo.describir()),
-    "9": opcion_carrera,
+    "6": opcion_wait,
+    "7": opcion_signal,
+    "8": opcion_escribir,
+    "9": lambda: print(semaforo.describir()),
+    "10": opcion_carrera,
     # --- Punto D: Deadlock (Kevin) ---
-    "10": opcion_solicitar,
-    "11": opcion_liberar,
-    "12": opcion_simular,
-    "13": opcion_detectar,
-    "14": opcion_abortar,
-    "15": lambda: print(gestor.describir()),
+    "11": opcion_solicitar,
+    "12": opcion_liberar,
+    "13": opcion_simular,
+    "14": opcion_detectar,
+    "15": opcion_abortar,
+    "16": lambda: print(gestor.describir()),
 }
+
 def main():
     while True:
         mostrar_menu()
