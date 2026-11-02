@@ -5,7 +5,7 @@ Menú principal del simulador.
 
 from kernel.semaforo import SemaforoBinario, SemaforoError, demo_condicion_de_carrera
 from kernel.deadlock import GestorRecursos, DeadlockError
-from kernel.procesos import Planificador, crear_proceso
+from kernel.procesos import Planificador, crear_proceso, LISTO, BLOQUEADO
 from kernel.memoria import GestorMemoria, MemoriaError
 
 # Un solo semáforo y un solo gestor de recursos para todo el programa
@@ -44,25 +44,58 @@ def mostrar_menu():
     print("  16. Ver estado de los recursos")
     print("   0. Salir")
 
+def obtener_proceso_activo(mensaje):
+    
+    #Pide un PID y lo busca en el planificador
+    #Devuelve el PCB si el proceso existe y está activo; si no, muestra
+    #un error y devuelve None
+    
+    pid = leer_numero(mensaje)
+    proceso = planificador.buscar_proceso(pid)
+    if proceso is None:
+        print(f"[ERROR] No existe un proceso activo con PID {pid}. "
+              f"Créalo primero con la opción 1.")
+    return proceso
+
+def desbloquear(pid):
+    #Si el proceso con ese PID está activo, lo regresa a estado Listo
+    proceso = planificador.buscar_proceso(pid)
+    if proceso is not None:
+        proceso.estado = LISTO
+
 def opcion_wait():
-    pid = leer_numero("PID del proceso: ")
+    proceso = obtener_proceso_activo("PID del proceso: ")
+    if proceso is None:
+        return
+    pid = proceso.pid
     if semaforo.wait(pid):
         print(f"[OK] P{pid} entra a la sección crítica")
     else:
+        proceso.estado = BLOQUEADO
         print(f"[BLOQUEO] La sección está ocupada: P{pid} queda BLOQUEADO en la cola de espera")
+
 def opcion_signal():
-    pid = leer_numero("PID del proceso: ")
+    proceso = obtener_proceso_activo("PID del proceso: ")
+    if proceso is None:
+        return
+    pid = proceso.pid
     siguiente = semaforo.signal(pid)
     print(f"[OK] P{pid} sale de la sección crítica")
     if siguiente is None:
         print("     El semáforo queda libre (valor = 1)")
     else:
+        desbloquear(siguiente)
         print(f"     P{siguiente} sale de la cola y entra a la sección crítica")
+
 def opcion_escribir():
-    pid = leer_numero("PID del proceso: ")
+    proceso = obtener_proceso_activo("PID del proceso: ")
+    if proceso is None:
+        return
+    pid = proceso.pid
     valor = leer_numero("Nuevo valor de la variable: ")
     anterior = semaforo.escribir(pid, valor)
     print(f"[OK] P{pid} cambió la variable compartida: {anterior} -> {valor}")
+
 def opcion_carrera():
     for usar_semaforo in (False, True):
         resultado, pasos = demo_condicion_de_carrera(usar_semaforo)
@@ -71,26 +104,43 @@ def opcion_carrera():
             print("  " + paso)
 
 def opcion_solicitar():
-    pid = leer_numero("PID del proceso: ")
+    proceso = obtener_proceso_activo("PID del proceso: ")
+    if proceso is None:
+        return
+    pid = proceso.pid
     recurso = input("Recurso (R1 o R2): ")
     if gestor.solicitar(pid, recurso):
         print(f"[OK] {recurso.strip().upper()} asignado a P{pid}")
     else:
+        proceso.estado = BLOQUEADO
         print(f"[BLOQUEO] {recurso.strip().upper()} está ocupado: P{pid} queda BLOQUEADO esperando")
         alerta_si_hay_deadlock()
+
 def opcion_liberar():
-    pid = leer_numero("PID del proceso: ")
+    proceso = obtener_proceso_activo("PID del proceso: ")
+    if proceso is None:
+        return
+    pid = proceso.pid
     recurso = input("Recurso (R1 o R2): ")
     siguiente = gestor.liberar(pid, recurso)
     print(f"[OK] P{pid} liberó {recurso.strip().upper()}")
     if siguiente is not None:
+        desbloquear(siguiente)
         print(f"     {recurso.strip().upper()} pasa a P{siguiente}, que se desbloquea")
+
 def opcion_simular():
-    pid_a = leer_numero("PID del proceso A: ")
-    pid_b = leer_numero("PID del proceso B: ")
+    proceso_a = obtener_proceso_activo("PID del proceso A: ")
+    proceso_b = obtener_proceso_activo("PID del proceso B: ")
+    if proceso_a is None or proceso_b is None:
+        return
+    pid_a = proceso_a.pid
+    pid_b = proceso_b.pid
     for paso in gestor.simular_deadlock(pid_a, pid_b):
         print("  " + paso)
+    proceso_a.estado = BLOQUEADO
+    proceso_b.estado = BLOQUEADO
     alerta_si_hay_deadlock()
+
 def opcion_detectar():
     ciclo = gestor.detectar_deadlock()
     if ciclo:
@@ -98,8 +148,22 @@ def opcion_detectar():
         print(f"           Para romperlo usa la opción 15 y aborta P{ciclo[0]} o P{ciclo[1]}")
     else:
         print("[OK] No hay deadlock: el grafo de espera no tiene ciclos")
+
+def retirar_proceso(pid):
+
+    #Al abortar un proceso: si tenía la sección crítica se la entrega al
+    #siguiente de la cola, y lo saca de la cola de listos del planificador.
+    
+    siguiente = semaforo.liberar_proceso(pid)
+    if siguiente is not None:
+        desbloquear(siguiente)
+    planificador.quitar_proceso(pid)
+
 def opcion_abortar():
-    pid = leer_numero("PID del proceso a abortar: ")
+    proceso = obtener_proceso_activo("PID del proceso a abortar: ")
+    if proceso is None:
+        return
+    pid = proceso.pid
     habia_deadlock = bool(gestor.detectar_deadlock())
     entregas = gestor.abortar_proceso(pid)
     
@@ -107,7 +171,7 @@ def opcion_abortar():
     if memoria.liberar_memoria(pid):
         print(f"[MEMORIA] Se liberó la memoria de P{pid}")
 
-    semaforo.liberar_proceso(pid)  # si tenía la sección crítica, también la suelta
+    retirar_proceso(pid)  # suelta la sección crítica y lo saca de la cola de listos
     print(f"[ALERTA] P{pid} abortado")
     for recurso, nuevo_dueno in entregas:
         if nuevo_dueno is None:
@@ -116,6 +180,7 @@ def opcion_abortar():
             print(f"         {recurso} pasa a P{nuevo_dueno}, que se desbloquea")
     if habia_deadlock and not gestor.detectar_deadlock():
         print("[OK] Deadlock resuelto: se rompió la espera circular")
+
 def alerta_si_hay_deadlock():
     ciclo = gestor.detectar_deadlock()
     if ciclo:
@@ -151,10 +216,25 @@ def opcion_ejecutar_round_robin():
     # Un proceso terminado ya no necesita su memoria, así que se libera.
     # liberar_memoria devuelve False si ya se había liberado antes,
     # por eso solo se muestra el mensaje la primera vez.
+    bloqueados = []
+    for proceso in planificador.cola_listos:
+        if proceso.estado == BLOQUEADO:
+            bloqueados.append(f"P{proceso.pid}")
+
+    if bloqueados:
+        print(f"[ERROR] No se puede ejecutar Round Robin: {', '.join(bloqueados)} "
+              f"está(n) bloqueado(s).")
+        print("        Usa signal(), libera recursos o aborta un proceso primero.")
+        return
+
+    planificador.ejecutar_round_robin()
+
+    # Un proceso terminado ya no necesita su memoria, así que se libera.
+    # liberar_memoria devuelve False si ya se había liberado antes,
+    # por eso solo se muestra el mensaje la primera vez.
     for proceso in planificador.terminados:
         if memoria.liberar_memoria(proceso.pid):
             print(f"[MEMORIA] Se liberaron {proceso.tamano_memoria} MB de P{proceso.pid}")
-                
 
 def opcion_ver_memoria():
     """Muestra cuánta RAM está ocupada y libre, y qué procesos la usan."""
