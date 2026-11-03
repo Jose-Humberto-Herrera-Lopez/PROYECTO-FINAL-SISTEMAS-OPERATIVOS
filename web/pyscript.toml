@@ -4,3 +4,5 @@
 "../kernel/__init__.py" = "kernel/__init__.py"
 "../kernel/semaforo.py" = "kernel/semaforo.py"
 "../kernel/deadlock.py" = "kernel/deadlock.py"
+"../kernel/procesos.py" = "kernel/procesos.py"
+"../kernel/memoria.py" = "kernel/memoria.py"
